@@ -1,0 +1,11 @@
+
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg.event === 'node_update') {
+          const n = msg.data as Node;
+          setNodes(prev => ({ ...prev, [n.id]: n }));
+        } else if (msg.event === 'security_event') {
+          setEvents(prev => [msg.data as Event, ...prev].slice(0, 100));
+        }
+      } catch {}
+    

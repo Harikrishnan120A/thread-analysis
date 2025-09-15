@@ -1,0 +1,13 @@
+﻿fastapi
+uvicorn[standard]
+pydantic
+pymongo
+qdrant-client
+google-generativeai
+langgraph
+websockets
+python-dotenv
+httpx
+numpy
+scikit-learn
+networkx

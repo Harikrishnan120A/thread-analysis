@@ -1,0 +1,25 @@
+{
+    "name":  "cyberguard-frontend",
+    "version":  "0.1.0",
+    "private":  true,
+    "scripts":  {
+                    "dev":  "next dev -H 0.0.0.0 -p 3000",
+                    "build":  "next build",
+                    "start":  "next start -H 0.0.0.0 -p 3000",
+                    "lint":  "next lint"
+                },
+    "dependencies":  {
+                         "next":  "14.2.5",
+                         "react":  "18.2.0",
+                         "react-dom":  "18.2.0",
+                         "vis-network":  "9.1.9"
+                     },
+    "devDependencies":  {
+                            "@types/node":  "20.11.30",
+                            "@types/react":  "18.2.60",
+                            "@types/react-dom":  "18.2.19",
+                            "typescript":  "5.4.5",
+                            "eslint":  "8.57.0",
+                            "eslint-config-next":  "14.2.5"
+                        }
+}

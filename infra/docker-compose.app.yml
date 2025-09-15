@@ -1,0 +1,32 @@
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017
+      - MONGODB_DB=cyberguard
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_COLLECTION=threat_patterns
+      - BACKEND_PORT=8000
+      - WS_PATH=/ws
+      # - GEMINI_API_KEY=your_key
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongo
+      - qdrant
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_BACKEND_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_BACKEND_WS_URL=ws://localhost:8000/ws
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend

@@ -1,0 +1,36 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+button { cursor: pointer; }
+
+:root {
+  --bg: #0b1020;
+  --panel: #0f1630;
+  --panel-alt: #121939;
+  --text: #e6eefc;
+  --border: #223;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  gap: 16px;
+}
+
+@media (max-width: 980px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.topology {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  height: 300px;
+}
+
+@media (max-width: 600px) {
+  .topology {
+    height: 220px;
+  }
+}
