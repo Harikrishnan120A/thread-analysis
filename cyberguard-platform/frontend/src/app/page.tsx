@@ -151,6 +151,11 @@ function DashboardView({ connected, nodes, events, aiDecisions, simulateThreat, 
         <MetricsBar />
       </section>
 
+      {/* Demo Summary */}
+      <section className="demo-summary-section" style={{ margin: '20px 0' }}>
+        <DemoSummaryCard />
+      </section>
+
       {/* Main Grid */}
       <div className="dashboard-grid">
         {/* Network Panel */}
@@ -340,6 +345,31 @@ function SettingsView() {
 
 // Threat Details Component
 function ThreatDetails({ threat }: { threat: any }) {
+  const [investigating, setInvestigating] = React.useState(false);
+  const [actionStatus, setActionStatus] = React.useState<string | null>(null);
+
+  const handleInvestigate = async () => {
+    setInvestigating(true);
+    setActionStatus('Analyzing threat patterns...');
+    
+    // Simulate investigation process
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    setActionStatus('✅ Investigation complete - No additional threats found');
+    setInvestigating(false);
+  };
+
+  const handleQuarantine = async () => {
+    setActionStatus('🔒 Quarantining node ' + threat.node_id + '...');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setActionStatus('✅ Node quarantined successfully');
+  };
+
+  const handleBlock = async () => {
+    setActionStatus('🚫 Blocking threat source...');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setActionStatus('✅ Threat source blocked');
+  };
+
   return (
     <div className="threat-detail-card">
       <div className="detail-header">
@@ -364,10 +394,32 @@ function ThreatDetails({ threat }: { threat: any }) {
         </div>
       </div>
 
+      {actionStatus && (
+        <div className={`action-status ${actionStatus.includes('✅') ? 'success' : 'processing'}`}>
+          {actionStatus}
+        </div>
+      )}
+
       <div className="detail-actions">
-        <button className="action-btn primary">Investigate</button>
-        <button className="action-btn secondary">Quarantine</button>
-        <button className="action-btn danger">Block</button>
+        <button 
+          className="action-btn primary" 
+          onClick={handleInvestigate}
+          disabled={investigating}
+        >
+          {investigating ? 'Investigating...' : 'Investigate'}
+        </button>
+        <button 
+          className="action-btn secondary"
+          onClick={handleQuarantine}
+        >
+          Quarantine
+        </button>
+        <button 
+          className="action-btn danger"
+          onClick={handleBlock}
+        >
+          Block
+        </button>
       </div>
     </div>
   );
