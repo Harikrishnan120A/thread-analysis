@@ -1,6 +1,25 @@
 version: "3.9"
 
 services:
+  # Nginx - Unified Entry Point (Single Port 8080)
+  nginx:
+    build:
+      context: ./nginx
+    profiles: ["dev", "prod"]
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+      - frontend
+    volumes:
+      - ../dataset_viewer.html:/usr/share/nginx/html/dataset_viewer.html:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/nginx-health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
   backend:
     build:
       context: ./backend
@@ -16,8 +35,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       # Optional Gemini
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-    ports:
-      - "${BACKEND_PORT:-8000}:8000"
+    expose:
+      - "8000"
     depends_on:
       - mongo
       - redis
@@ -33,13 +52,13 @@ services:
     profiles: ["dev"]
     command: ["sh","-lc","[ -d node_modules ] || npm ci --no-audit --no-fund; npm run dev"]
     environment:
-      # Ensure browser calls host-mapped backend, not service DNS
-      NEXT_PUBLIC_BACKEND_HTTP_URL: http://localhost:${BACKEND_PORT:-8000}
-      NEXT_PUBLIC_BACKEND_WS_URL: ws://localhost:${BACKEND_PORT:-8000}/ws
+      # Frontend now uses relative paths through Nginx (port 8080)
+      NEXT_PUBLIC_BACKEND_HTTP_URL: http://localhost:8080
+      NEXT_PUBLIC_BACKEND_WS_URL: ws://localhost:8080/ws
       HOST: 0.0.0.0
       PORT: 3000
-    ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+    expose:
+      - "3000"
     volumes:
       - ./frontend:/app
     depends_on:
@@ -57,8 +76,8 @@ services:
       QDRANT_PORT: "6333"
       REDIS_URL: redis://redis:6379/0
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-    ports:
-      - "${BACKEND_PORT:-8000}:8000"
+    expose:
+      - "8000"
     depends_on:
       - mongo
       - redis
@@ -70,12 +89,13 @@ services:
       context: ./frontend
       target: runner
     environment:
-      NEXT_PUBLIC_BACKEND_HTTP_URL: http://localhost:${BACKEND_PORT:-8000}
-      NEXT_PUBLIC_BACKEND_WS_URL: ws://localhost:${BACKEND_PORT:-8000}/ws
+      # Production also uses single port through Nginx (port 8080)
+      NEXT_PUBLIC_BACKEND_HTTP_URL: http://localhost:8080
+      NEXT_PUBLIC_BACKEND_WS_URL: ws://localhost:8080/ws
       HOST: 0.0.0.0
       PORT: 3000
-    ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+    expose:
+      - "3000"
     depends_on:
       - backend-prod
     profiles: ["prod"]

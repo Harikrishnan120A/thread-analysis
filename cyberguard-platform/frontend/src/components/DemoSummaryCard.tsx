@@ -17,7 +17,7 @@ export default function DemoSummaryCard() {
   const load = React.useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${BACKEND_HTTP_URL}/metrics`, { cache: 'no-store' });
+      const res = await fetch(`/api/metrics`, { cache: 'no-store' });
       const j = await res.json();
       setData(j);
     } catch {
@@ -57,7 +57,7 @@ export default function DemoSummaryCard() {
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Before/After Demo Summary</h3>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={exportPDF} className="inline-flex items-center rounded-md border px-2.5 py-1 text-xs hover:bg-slate-100 dark:hover:bg-slate-800">Export PDF</button>
-          <a href={`${BACKEND_HTTP_URL}/metrics.csv`} target="_blank" className="inline-flex items-center rounded-md border px-2.5 py-1 text-xs hover:bg-slate-100 dark:hover:bg-slate-800">Export CSV</a>
+          <a href="/api/metrics.csv" target="_blank" className="inline-flex items-center rounded-md border px-2.5 py-1 text-xs hover:bg-slate-100 dark:hover:bg-slate-800">Export CSV</a>
         </div>
       </div>
       <div ref={ref} className="grid grid-cols-3 gap-3 text-xs">

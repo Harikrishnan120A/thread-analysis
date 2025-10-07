@@ -25,6 +25,38 @@ from collections import defaultdict, deque
 logger = logging.getLogger("cyberguard")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
+# Cache for dataset - load once, use many times
+_dataset_df = None
+_dataset_cache = None
+_dataset_loaded = False
+
+def load_dataset():
+    """Load dataset once and cache it"""
+    global _dataset_df, _dataset_cache, _dataset_loaded
+    
+    if _dataset_loaded and _dataset_df is not None:
+        return _dataset_df
+    
+    try:
+        import pandas as pd
+        import os
+        
+        dataset_path = "/root/.cache/kagglehub/datasets/aryan208/cybersecurity-threat-detection-logs/versions/1/cybersecurity_threat_detection_logs.csv"
+        
+        if not os.path.exists(dataset_path):
+            logger.error("Dataset file not found!")
+            return None
+        
+        logger.info("🔄 Loading 6M dataset into memory (one-time operation)...")
+        _dataset_df = pd.read_csv(dataset_path)
+        _dataset_loaded = True
+        logger.info(f"✅ Dataset loaded! {len(_dataset_df):,} records cached in memory")
+        
+        return _dataset_df
+    except Exception as e:
+        logger.error(f"❌ Error loading dataset: {e}")
+        return None
+
 
 class ConnectionManager:
     def __init__(self) -> None:
@@ -256,6 +288,45 @@ async def health() -> Dict[str, Any]:
     }
 
 
+@app.get("/api/health")
+async def api_health() -> Dict[str, Any]:
+    """Health check endpoint with /api prefix for consistency"""
+    return {
+        "status": "healthy",
+        "service": "cyberguard-backend",
+        "services": {
+            "mongodb": db_state.mongo_ok,
+            "qdrant": db_state.qdrant_ok,
+        },
+        "nodes": len(simulator.nodes),
+        "uptime": time.time() - server_started,
+    }
+
+
+@app.get("/config")
+async def get_config() -> Dict[str, Any]:
+    """Configuration endpoint for frontend"""
+    return {
+        "backend_version": "1.0.0",
+        "features": {
+            "dataset": True,
+            "ai_analysis": True,
+            "threat_simulation": True,
+            "real_time_monitoring": True
+        },
+        "dataset": {
+            "loaded": _dataset_loaded,
+            "size": len(_dataset_df) if _dataset_df is not None else 0
+        }
+    }
+
+
+@app.get("/api/config")
+async def api_get_config() -> Dict[str, Any]:
+    """Configuration endpoint with /api prefix"""
+    return await get_config()
+
+
 @app.get("/nodes", response_model=List[models.NodeStatus])
 async def list_nodes() -> List[models.NodeStatus]:
     return list(simulator.nodes.values())
@@ -377,6 +448,12 @@ async def simulate_threat(node_id: str, request: Request, body: models.SimulateT
             logger.debug(f"Mongo insert event failed: {e}")
     await manager.broadcast({"type": "security_event", "data": evt.model_dump()})
     return evt
+
+
+@app.post("/api/simulate-threat/{node_id}", response_model=models.SecurityEvent)
+async def api_simulate_threat(node_id: str, request: Request, body: models.SimulateThreatBody | None = None) -> models.SecurityEvent:
+    """Simulate threat with /api prefix for frontend compatibility"""
+    return await simulate_threat(node_id=node_id, request=request, body=body)
 
 
 # Backwards-compatible endpoint used earlier
@@ -587,6 +664,88 @@ async def update_config(body: UpdateAppSettings) -> Dict[str, object]:
     for k, v in data.items():
         setattr(app_settings, k, v)
     return app_settings.model_dump()
+
+
+@app.get("/api/dataset/sample")
+async def get_dataset_sample(limit: int = 5):
+    """Get a sample of the real threat dataset - uses cached data"""
+    try:
+        df = load_dataset()
+        
+        if df is None:
+            return {"error": "Dataset not found", "loaded": False}
+        
+        # Get random samples for variety
+        sample = df.sample(n=min(limit, len(df)))
+        
+        return {
+            "loaded": True,
+            "total_records": len(df),
+            "sample_size": len(sample),
+            "records": sample.to_dict('records')
+        }
+    except Exception as e:
+        logger.error(f"Error getting dataset sample: {e}")
+        return {"error": str(e), "loaded": False}
+
+
+@app.get("/api/dataset/malicious")
+async def get_malicious_attacks(limit: int = 20):
+    """Get real malicious attacks from the dataset - uses cached data"""
+    try:
+        df = load_dataset()
+        
+        if df is None:
+            return {"error": "Dataset not found"}
+        
+        malicious = df[df['threat_label'] == 'malicious'].head(limit)
+        
+        return {
+            "total_malicious": len(df[df['threat_label'] == 'malicious']),
+            "records": malicious.to_dict('records')
+        }
+    except Exception as e:
+        logger.error(f"Error getting malicious attacks: {e}")
+        return {"error": str(e)}
+
+
+@app.get("/api/dataset/stats")
+async def get_dataset_stats():
+    """Get dataset statistics - cached for performance"""
+    global _dataset_cache
+    
+    try:
+        # Return cached stats if available
+        if _dataset_cache:
+            return _dataset_cache
+        
+        df = load_dataset()
+        
+        if df is None:
+            return {"error": "Dataset not found", "loaded": False}
+        
+        # Cache the statistics
+        _dataset_cache = {
+            "loaded": True,
+            "total_records": len(df),
+            "columns": df.columns.tolist(),
+            "threat_distribution": df['threat_label'].value_counts().to_dict(),
+            "protocol_distribution": df['protocol'].value_counts().head(10).to_dict(),
+            "top_paths": df['request_path'].value_counts().head(10).to_dict(),
+            "action_distribution": df['action'].value_counts().to_dict(),
+            "log_type_distribution": df['log_type'].value_counts().to_dict(),
+            "bytes_stats": {
+                "mean": float(df['bytes_transferred'].mean()),
+                "median": float(df['bytes_transferred'].median()),
+                "min": int(df['bytes_transferred'].min()),
+                "max": int(df['bytes_transferred'].max())
+            }
+        }
+        
+        return _dataset_cache
+    except Exception as e:
+        logger.error(f"Error getting dataset stats: {e}")
+        return {"error": str(e), "loaded": False}
 
 
 @app.websocket("/ws")

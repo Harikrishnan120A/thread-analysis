@@ -16,6 +16,12 @@ try:
 except Exception:  # pragma: no cover
     IsolationForest = None  # type: ignore
 
+# Import threat dataset loader
+try:
+    from data_loader import ThreatDatasetLoader  # type: ignore
+except Exception:  # pragma: no cover
+    ThreatDatasetLoader = None  # type: ignore
+
 
 class AIEngine:
     """
@@ -53,8 +59,80 @@ class AIEngine:
         self.iforest: Dict[str, object] = {}
         # Very small RL Q-table for action selection
         self.q_table: Dict[Tuple[str, str], float] = defaultdict(float)  # (severity, feature) -> value
+        
+        # Load threat detection dataset
+        self.threat_loader: Optional[object] = None
+        self.threat_patterns: List[Dict] = []
+        self.attack_signatures: Dict[str, List[Dict]] = {}
+        self.anomaly_thresholds: Dict[str, Dict[str, float]] = {}
+        self._load_threat_database()
 
-    # ------- history handling -------
+    # ------- threat database loading -------
+    def _load_threat_database(self) -> None:
+        """Load threat patterns from Kaggle dataset if available"""
+        if ThreatDatasetLoader is None:
+            print("⚠️  ThreatDatasetLoader not available, using built-in heuristics")
+            return
+        
+        try:
+            print("🔄 Loading threat detection dataset...")
+            self.threat_loader = ThreatDatasetLoader()
+            
+            # Try to load existing processed data first
+            import json
+            from pathlib import Path
+            
+            cache_dir = os.path.join(os.path.expanduser("~"), ".cyberguard", "datasets", "processed")
+            patterns_file = os.path.join(cache_dir, "threat_patterns.json")
+            signatures_file = os.path.join(cache_dir, "attack_signatures.json")
+            
+            if os.path.exists(patterns_file) and os.path.exists(signatures_file):
+                with open(patterns_file, 'r') as f:
+                    self.threat_patterns = json.load(f)
+                with open(signatures_file, 'r') as f:
+                    self.attack_signatures = json.load(f)
+                print(f"✅ Loaded {len(self.threat_patterns)} threat patterns from cache")
+            else:
+                # Download and process dataset
+                df = self.threat_loader.load_dataset()
+                self.threat_patterns = self.threat_loader.extract_threat_patterns(df)
+                self.attack_signatures = self.threat_loader.get_attack_signatures(df)
+                self.anomaly_thresholds = self.threat_loader.get_anomaly_thresholds(df)
+                self.threat_loader.save_processed_data()
+                print(f"✅ Loaded and processed {len(self.threat_patterns)} threat patterns")
+                
+        except Exception as e:
+            print(f"⚠️  Could not load threat database: {e}")
+            print("    Falling back to built-in heuristics")
+            self.threat_loader = None
+
+    def _match_threat_pattern(self, flags: List[str], metrics: models.NodeMetrics) -> Optional[str]:
+        """Match current behavior against known threat patterns from dataset"""
+        if not self.threat_patterns:
+            return None
+        
+        # Simple pattern matching based on detected flags
+        flag_keywords = {
+            'cpu_spike': ['ddos', 'dos', 'stress', 'overload'],
+            'memory_leak': ['memory', 'leak', 'exhaustion', 'buffer'],
+            'net_anomaly': ['ddos', 'exfiltration', 'scan', 'probe', 'flood'],
+            'behavioral_anomaly': ['malware', 'trojan', 'anomaly']
+        }
+        
+        matched_attacks = []
+        for flag in flags:
+            keywords = flag_keywords.get(flag, [])
+            for pattern in self.threat_patterns:
+                attack_type = pattern.get('attack_type', '').lower()
+                if any(kw in attack_type for kw in keywords):
+                    matched_attacks.append(attack_type)
+        
+        if matched_attacks:
+            # Return the most common match
+            return max(set(matched_attacks), key=matched_attacks.count)
+        
+        return None
+
     def record(self, node: models.NodeStatus) -> None:
         self.history[node.id].append((time.time(), node.metrics))
 
@@ -138,12 +216,21 @@ class AIEngine:
 
     def _gemini_reason(self, node_id: str, flags: List[str], severity: str) -> Optional[str]:
         if not self.gemini:
+            # Use threat pattern matching as fallback
+            matched_threat = self._match_threat_pattern(flags, self.history[node_id][-1][1] if self.history[node_id] else None)
+            if matched_threat:
+                return f"Detected pattern matching '{matched_threat}' attack. Flags: {', '.join(flags)}. Severity: {severity.upper()}."
             return None
         try:
+            # Enhanced prompt with threat database context
+            threat_context = ""
+            if self.threat_patterns:
+                threat_context = f" Known threat patterns in database: {len(self.threat_patterns)} types."
+            
             prompt = (
                 "You are a SOC assistant. Given detected anomalies "
-                f"{flags} on node {node_id} with severity {severity}, "
-                "explain briefly (one sentence) the most likely cause and next step."
+                f"{flags} on node {node_id} with severity {severity}.{threat_context} "
+                "Explain briefly (one sentence) the most likely cause and next step."
             )
             res = self.gemini.generate_content(prompt)  # type: ignore[attr-defined]
             text = getattr(res, "text", None) or (getattr(res, "candidates", [None])[0].content.parts[0].text if getattr(res, "candidates", None) else None)  # type: ignore[index]
@@ -171,8 +258,13 @@ class AIEngine:
         severity = self._classify(flags)
         if severity == "low" and not flags:
             return None
+        
+        # Match against known threat patterns
+        matched_threat = self._match_threat_pattern(flags, node.metrics)
+        
         reasoning = self._gemini_reason(node.id, flags, severity) or (
-            f"Detected {', '.join(flags)}; classified as {severity.upper()}"
+            f"Detected {', '.join(flags)}; classified as {severity.upper()}" +
+            (f"; matches '{matched_threat}' pattern" if matched_threat else "")
         )
         # Confidence heuristic
         confidence = min(0.99, 0.6 + 0.1 * len(flags))

@@ -116,7 +116,7 @@ export function useRealtime(): UseRealtime {
     const id = nodeId ?? 'random';
     try {
       setBusy(true);
-      await fetch(`${BACKEND_HTTP_URL}/demo/ddos/${id}`, { method: 'POST' });
+      await fetch(`/api/demo/ddos/${id}`, { method: 'POST' });
     } catch {
     } finally {
       setBusy(false);
@@ -126,7 +126,7 @@ export function useRealtime(): UseRealtime {
   const demoReset = useCallback(async () => {
     try {
       setBusy(true);
-      await fetch(`${BACKEND_HTTP_URL}/demo/reset`, { method: 'POST' });
+      await fetch(`/api/demo/reset`, { method: 'POST' });
     } catch {
     } finally {
       setBusy(false);
@@ -136,7 +136,7 @@ export function useRealtime(): UseRealtime {
   const redistribute = useCallback(async (nodeId: string) => {
     try {
       setBusy(true);
-      await fetch(`${BACKEND_HTTP_URL}/redistribute-load/${nodeId}`, { method: 'POST' });
+      await fetch(`/api/redistribute-load/${nodeId}`, { method: 'POST' });
     } catch {
     } finally {
       setBusy(false);

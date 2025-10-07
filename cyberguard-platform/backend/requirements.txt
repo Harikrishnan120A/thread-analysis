@@ -10,3 +10,5 @@ redis==5.2.1
 scikit-learn==1.5.2
 numpy==2.3.3
 orjson==3.11.3
+kagglehub==0.3.4
+pandas==2.2.3

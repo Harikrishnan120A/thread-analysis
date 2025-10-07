@@ -31,7 +31,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const fetchSettings = React.useCallback(async () => {
     try {
-      const r = await fetch(`${BACKEND_HTTP_URL}/config`, { cache: 'no-store' });
+      const r = await fetch(`/api/config`, { cache: 'no-store' });
       if (r.ok) {
         const j = await r.json();
         setSettingsState((prev) => ({ ...prev, ...j }));
@@ -46,7 +46,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const setSettings = React.useCallback(async (patch: Partial<AppSettings>) => {
     setSettingsState((prev) => ({ ...prev, ...patch }));
     try {
-      await fetch(`${BACKEND_HTTP_URL}/config`, {
+      await fetch(`/api/config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),

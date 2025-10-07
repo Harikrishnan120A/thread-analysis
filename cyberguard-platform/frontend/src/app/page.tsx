@@ -21,6 +21,7 @@ export default function CyberGuardDashboard() {
   const navigationItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home, active: true },
     { id: 'threats', label: 'Threats', icon: AlertTriangle, count: events.length },
+    { id: 'dataset', label: 'Real Dataset', icon: Activity, special: true },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
@@ -29,6 +30,8 @@ export default function CyberGuardDashboard() {
     switch (currentView) {
       case 'threats':
         return <ThreatsView events={events} aiDecisions={aiDecisions} simulateThreat={simulateThreat} />;
+      case 'dataset':
+        return <DatasetView />;
       case 'analytics':
         return <AnalyticsView />;
       case 'settings':
@@ -420,6 +423,355 @@ function ThreatDetails({ threat }: { threat: any }) {
         >
           Block
         </button>
+      </div>
+    </div>
+  );
+}
+
+// Dataset View Component - REAL KAGGLE DATA
+function DatasetView() {
+  const [stats, setStats] = React.useState<any>(null);
+  const [malicious, setMalicious] = React.useState<any[]>([]);
+  const [sample, setSample] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [activeTab, setActiveTab] = React.useState<'overview' | 'malicious' | 'sample'>('overview');
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch statistics
+        const statsRes = await fetch('/api/dataset/stats');
+        if (!statsRes.ok) throw new Error('Failed to fetch stats');
+        const statsData = await statsRes.json();
+        setStats(statsData);
+        
+        // Fetch malicious attacks
+        const malRes = await fetch('/api/dataset/malicious?limit=10');
+        if (!malRes.ok) throw new Error('Failed to fetch malicious data');
+        const malData = await malRes.json();
+        setMalicious(malData.records || []);
+        
+        // Fetch sample
+        const sampleRes = await fetch('/api/dataset/sample?limit=5');
+        if (!sampleRes.ok) throw new Error('Failed to fetch sample');
+        const sampleData = await sampleRes.json();
+        setSample(sampleData.records || []);
+        
+        setError(null);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="dataset-view">
+        <div className="view-header">
+          <h2>📊 Real Kaggle Dataset</h2>
+          <p>6 Million Cybersecurity Threat Records</p>
+        </div>
+        <div style={{ textAlign: 'center', padding: '100px 20px' }}>
+          <div className="spinner" style={{ margin: '0 auto 20px' }} />
+          <p>Loading real dataset from Kaggle...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="dataset-view">
+        <div className="view-header">
+          <h2>📊 Real Kaggle Dataset</h2>
+        </div>
+        <div style={{ textAlign: 'center', padding: '100px 20px', color: '#ff6b6b' }}>
+          <AlertTriangle style={{ width: 64, height: 64, margin: '0 auto 20px' }} />
+          <p>Error loading dataset: {error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="dataset-view">
+      <div className="view-header">
+        <h2>📊 Real Kaggle Dataset</h2>
+        <p>6 Million Cybersecurity Threat Records - Live from Kaggle</p>
+      </div>
+
+      {/* Dataset Status Banner */}
+      <div style={{ 
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+        padding: '20px', 
+        borderRadius: '12px', 
+        marginBottom: '20px',
+        color: 'white'
+      }}>
+        <h3 style={{ margin: '0 0 10px 0' }}>✅ Dataset Status: LOADED</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
+          <div>
+            <div style={{ fontSize: '12px', opacity: 0.9 }}>Total Records</div>
+            <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
+              {stats?.total_records?.toLocaleString() || '0'}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '12px', opacity: 0.9 }}>Malicious Attacks</div>
+            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ff6b6b' }}>
+              {stats?.threat_distribution?.malicious?.toLocaleString() || '0'}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '12px', opacity: 0.9 }}>Suspicious Activity</div>
+            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#feca57' }}>
+              {stats?.threat_distribution?.suspicious?.toLocaleString() || '0'}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '12px', opacity: 0.9 }}>Benign Traffic</div>
+            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#48dbfb' }}>
+              {stats?.threat_distribution?.benign?.toLocaleString() || '0'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ 
+        display: 'flex', 
+        gap: '10px', 
+        marginBottom: '20px', 
+        borderBottom: '2px solid rgba(255,255,255,0.1)',
+        paddingBottom: '10px'
+      }}>
+        <button
+          onClick={() => setActiveTab('overview')}
+          style={{
+            padding: '10px 20px',
+            background: activeTab === 'overview' ? 'rgba(102, 126, 234, 0.3)' : 'transparent',
+            border: 'none',
+            color: 'white',
+            cursor: 'pointer',
+            borderRadius: '8px',
+            fontWeight: activeTab === 'overview' ? 'bold' : 'normal'
+          }}
+        >
+          📊 Overview
+        </button>
+        <button
+          onClick={() => setActiveTab('malicious')}
+          style={{
+            padding: '10px 20px',
+            background: activeTab === 'malicious' ? 'rgba(255, 107, 107, 0.3)' : 'transparent',
+            border: 'none',
+            color: 'white',
+            cursor: 'pointer',
+            borderRadius: '8px',
+            fontWeight: activeTab === 'malicious' ? 'bold' : 'normal'
+          }}
+        >
+          🚨 Malicious Attacks
+        </button>
+        <button
+          onClick={() => setActiveTab('sample')}
+          style={{
+            padding: '10px 20px',
+            background: activeTab === 'sample' ? 'rgba(72, 219, 251, 0.3)' : 'transparent',
+            border: 'none',
+            color: 'white',
+            cursor: 'pointer',
+            borderRadius: '8px',
+            fontWeight: activeTab === 'sample' ? 'bold' : 'normal'
+          }}
+        >
+          📋 Sample Data
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'overview' && (
+        <div className="dataset-overview">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+            {/* Protocol Distribution */}
+            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '20px', borderRadius: '12px' }}>
+              <h3>🌐 Protocol Distribution</h3>
+              <div style={{ marginTop: '15px' }}>
+                {stats?.protocol_distribution && Object.entries(stats.protocol_distribution).map(([protocol, count]: [string, any]) => (
+                  <div key={protocol} style={{ marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                      <span>{protocol}</span>
+                      <span style={{ fontWeight: 'bold' }}>{count.toLocaleString()}</span>
+                    </div>
+                    <div style={{ 
+                      height: '8px', 
+                      background: 'rgba(255,255,255,0.1)', 
+                      borderRadius: '4px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{ 
+                        height: '100%', 
+                        width: `${(count / stats.total_records) * 100}%`,
+                        background: 'linear-gradient(90deg, #667eea, #764ba2)',
+                        borderRadius: '4px'
+                      }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Top Attack Paths */}
+            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '20px', borderRadius: '12px' }}>
+              <h3>🎯 Top Attack Paths</h3>
+              <div style={{ marginTop: '15px' }}>
+                {stats?.top_paths && Object.entries(stats.top_paths).slice(0, 5).map(([path, count]: [string, any]) => (
+                  <div key={path} style={{ 
+                    padding: '10px', 
+                    background: 'rgba(255,107,107,0.1)', 
+                    marginBottom: '8px',
+                    borderRadius: '6px',
+                    borderLeft: '3px solid #ff6b6b'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <code style={{ color: '#ff6b6b' }}>{path}</code>
+                      <span style={{ fontWeight: 'bold' }}>{count.toLocaleString()}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'malicious' && (
+        <div className="malicious-attacks">
+          <h3 style={{ marginBottom: '15px' }}>🚨 Recent Malicious Attacks</h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ 
+              width: '100%', 
+              borderCollapse: 'collapse',
+              background: 'rgba(255,255,255,0.03)',
+              borderRadius: '12px',
+              overflow: 'hidden'
+            }}>
+              <thead>
+                <tr style={{ background: 'rgba(255,107,107,0.2)' }}>
+                  <th style={{ padding: '12px', textAlign: 'left' }}>Timestamp</th>
+                  <th style={{ padding: '12px', textAlign: 'left' }}>Source IP</th>
+                  <th style={{ padding: '12px', textAlign: 'left' }}>Dest IP</th>
+                  <th style={{ padding: '12px', textAlign: 'left' }}>Protocol</th>
+                  <th style={{ padding: '12px', textAlign: 'left' }}>Path</th>
+                  <th style={{ padding: '12px', textAlign: 'left' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {malicious.map((record, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <td style={{ padding: '12px' }}>{record.timestamp}</td>
+                    <td style={{ padding: '12px' }}><code>{record.source_ip}</code></td>
+                    <td style={{ padding: '12px' }}><code>{record.destination_ip}</code></td>
+                    <td style={{ padding: '12px' }}>
+                      <span style={{ 
+                        background: 'rgba(102,126,234,0.3)', 
+                        padding: '4px 8px', 
+                        borderRadius: '4px' 
+                      }}>
+                        {record.protocol}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px' }}><code>{record.request_path}</code></td>
+                    <td style={{ padding: '12px' }}>
+                      <span style={{ 
+                        background: 'rgba(255,107,107,0.3)', 
+                        padding: '4px 8px', 
+                        borderRadius: '4px',
+                        color: '#ff6b6b',
+                        fontWeight: 'bold'
+                      }}>
+                        {record.action}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'sample' && (
+        <div className="sample-data">
+          <h3 style={{ marginBottom: '15px' }}>📋 Random Sample Records</h3>
+          <div style={{ display: 'grid', gap: '15px' }}>
+            {sample.map((record, idx) => (
+              <div key={idx} style={{ 
+                background: 'rgba(255,255,255,0.05)', 
+                padding: '15px', 
+                borderRadius: '12px',
+                borderLeft: `4px solid ${
+                  record.label === 'malicious' ? '#ff6b6b' : 
+                  record.label === 'suspicious' ? '#feca57' : '#48dbfb'
+                }`
+              }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
+                  <div>
+                    <div style={{ fontSize: '11px', opacity: 0.7 }}>TIMESTAMP</div>
+                    <div style={{ fontFamily: 'monospace' }}>{record.timestamp}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', opacity: 0.7 }}>SOURCE → DEST</div>
+                    <div style={{ fontFamily: 'monospace' }}>{record.source_ip} → {record.destination_ip}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', opacity: 0.7 }}>PROTOCOL</div>
+                    <div style={{ fontWeight: 'bold' }}>{record.protocol}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', opacity: 0.7 }}>LABEL</div>
+                    <div>
+                      <span style={{ 
+                        background: record.label === 'malicious' ? 'rgba(255,107,107,0.3)' : 
+                                   record.label === 'suspicious' ? 'rgba(254,202,87,0.3)' : 'rgba(72,219,251,0.3)',
+                        padding: '4px 8px', 
+                        borderRadius: '4px',
+                        textTransform: 'uppercase',
+                        fontSize: '11px',
+                        fontWeight: 'bold'
+                      }}>
+                        {record.label}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                  <div style={{ fontSize: '11px', opacity: 0.7, marginBottom: '5px' }}>REQUEST PATH</div>
+                  <code style={{ color: '#667eea' }}>{record.request_path}</code>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* API Endpoint Reference */}
+      <div style={{ 
+        marginTop: '30px', 
+        padding: '15px', 
+        background: 'rgba(102,126,234,0.1)', 
+        borderRadius: '12px',
+        borderLeft: '4px solid #667eea'
+      }}>
+        <h4 style={{ marginTop: 0 }}>📡 API Endpoint</h4>
+        <code style={{ color: '#667eea' }}>/api/dataset/stats</code>
       </div>
     </div>
   );
